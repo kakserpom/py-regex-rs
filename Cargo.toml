@@ -1,7 +1,9 @@
 [package]
 name = "py-regex"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+description = "A small wrapper around the Python regex module via PyO3."
+license = "MIT"
 
 [dependencies]
-pyo3 = {  version = "0.24.1", features = ["auto-initialize"] }
+pyo3 = { version = "0.24.1", features = ["auto-initialize"] }

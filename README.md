@@ -15,10 +15,8 @@ regex engine directly from Rust.
 
 ## Requirements
 
-- Rust 1.65 or later (edition 2021)
 - Python 3.x with the `regex` package installed
 - `pyo3` 0.24.0
-- `py_regex` crate (local or published)
 
 ## Installation
 
@@ -27,7 +25,7 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 pyo3 = "0.24.0"
-py_regex = "0.1"
+py-regex = "0.1"
 ```
 
 Ensure that you have the Python `regex` module:
@@ -71,8 +69,8 @@ assert!(m.is_some());
 ### Find All Matches
 
 ```rust
-let re = PyRegex::new(r"\d+") ?;
-for m in re.find_iter("123 abc 456") ? {
+let re = PyRegex::new(r"\d+")?;
+for m in re.find_iter("123 abc 456")? {
     println!("Match: {:?}", m.group(0)?);
 }
 ```
@@ -90,7 +88,7 @@ assert_eq!(result, "There are NUM apples");
 ```rust
 let re = PyRegex::new(r"(\w+)@(\w+\.\w+)")?;
 if let Some(m) = re.find_iter("user@example.com").pop() {
-let parts = m.groups() ?; // Vec<Option<String>>
+let parts = m.groups()?; // Vec<Option<String>>
 // parts[0] is the full match, parts[1] username, parts[2] domain
 }
 ```
