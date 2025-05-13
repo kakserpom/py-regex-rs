@@ -1,9 +1,8 @@
-extern crate pyo3;
+pub extern crate pyo3;
+use pyo3::PyResult;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyIterator, PyModule};
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::thread;
 
 /// A wrapper for a compiled regular expression from the Python `regex` library.
 #[derive(Debug)]
@@ -14,10 +13,10 @@ impl PyRegex {
     /// Creates a new regular expression by compiling the pattern via Python's `regex.compile`.
     pub fn new(pattern: &str) -> PyResult<Self> {
         Python::with_gil(|py| {
-            let regex_module = PyModule::import(py, "regex")?;
-            let compiled = regex_module.call_method("compile", (pattern,), None)?;
             Ok(PyRegex {
-                compiled: compiled.into(),
+                compiled: PyModule::import(py, "regex")?
+                    .call_method("compile", (pattern,), None)?
+                    .into(),
             })
         })
     }
@@ -39,9 +38,7 @@ impl PyRegex {
             Ok(if result.is_none(py) {
                 None
             } else {
-                Some(PyRegexMatch {
-                    inner: result.into(),
-                })
+                Some(PyRegexMatch { inner: result })
             })
         })
     }
@@ -92,10 +89,21 @@ impl PyRegex {
 
     pub fn split(&self, text: &str) -> PyResult<Vec<String>> {
         Python::with_gil(|py| {
-            let kwargs = Self::kwargs(py);
             self.compiled
-                .call_method(py, "split", (text,), kwargs.as_ref())?
+                .call_method(py, "split", (text,), Self::kwargs(py).as_ref())?
                 .extract::<Vec<String>>(py)
+        })
+    }
+
+    /// Escapes a string.
+    pub fn escape(str: &str, special_only: bool, literal_spaces: bool) -> PyResult<String> {
+        Python::with_gil(|py| {
+            let kwargs = PyDict::new(py);
+            kwargs.set_item("special_only", special_only)?;
+            kwargs.set_item("literal_spaces", literal_spaces)?;
+            PyModule::import(py, "regex")?
+                .call_method("escape", (str,), Some::<Bound<PyDict>>(kwargs).as_ref())?
+                .extract::<String>()
         })
     }
 }
@@ -163,6 +171,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_escape() -> PyResult<()> {
+        // Initialize Python for multithreaded usage.
+        pyo3::prepare_freethreaded_python();
+
+        assert_eq!(PyRegex::escape("[]", false, false)?, "\\[\\]");
+
+        Ok(())
+    }
+    #[test]
     fn test_pyregex_match_methods() -> PyResult<()> {
         // Initialize Python for multithreaded usage.
         pyo3::prepare_freethreaded_python();
@@ -196,44 +213,4 @@ mod tests {
 
         Ok(())
     }
-}
-
-#[allow(dead_code)]
-fn example() -> PyResult<()> {
-    // Initialize Python for multithreaded usage.
-    pyo3::prepare_freethreaded_python();
-
-    let pattern = r"(?P<id>\d+)";
-    let text = "IDs: 101, 202, 303";
-    let re = Arc::new(PyRegex::new(pattern)?);
-
-    // Example usage of `search_match()` to obtain a `PyRegexMatch` object.
-    if let Some(m) = re.search_match(text)? {
-        println!("Full match (group 0): {:?}", m.group(0)?);
-        println!("Group 'id' (as group 0 here): {:?}", m.group(0)?);
-        println!("Groupdict: {:?}", m.groupdict()?);
-        println!("Span for group 0: {}..{}", m.start(0)?, m.end(0)?);
-    }
-
-    // Example of multithreaded usage of `find_iter()`, returning a `Vec<PyRegexMatch>`.
-    let mut handles = vec![];
-    for i in 0..4 {
-        let re_clone = Arc::clone(&re);
-        let text_clone = text.to_string();
-        let handle = thread::spawn(move || -> PyResult<()> {
-            let matches = re_clone.find_iter(&text_clone)?;
-            println!("Thread {}: found {} matches.", i, matches.len());
-            for m in matches {
-                println!("Thread {}: match group 0: {:?}", i, m.group(0)?);
-            }
-            Ok(())
-        });
-        handles.push(handle);
-    }
-
-    for handle in handles {
-        handle.join().unwrap()?;
-    }
-
-    Ok(())
 }
